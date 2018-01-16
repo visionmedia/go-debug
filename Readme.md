@@ -3,12 +3,12 @@
 
  Conditional debug logging for Go libraries.
 
- View the [docs](http://godoc.org/github.com/tj/go-debug).
+ View the [docs](http://godoc.org/github.com/visionmedia/go-debug).
 
 ## Installation
 
 ```
-$ go get github.com/tj/go-debug
+$ go get github.com/visionmedia/go-debug
 ```
 
 ## Example
@@ -16,7 +16,7 @@ $ go get github.com/tj/go-debug
 ```go
 package main
 
-import . "github.com/tj/go-debug"
+import . "github.com/visionmedia/go-debug"
 import "time"
 
 var debug = Debug("single")
