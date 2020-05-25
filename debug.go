@@ -20,7 +20,7 @@ var (
 )
 
 // Debugger function.
-type DebugFunction func(string, ...interface{})
+type DebugFunction func(interface{}, ...interface{})
 
 // Terminal colors used at random.
 var colors []string = []string{
@@ -80,13 +80,23 @@ func Debug(name string) DebugFunction {
 	color := colors[rand.Intn(len(colors))]
 	prev := time.Now()
 
-	return func(format string, args ...interface{}) {
+	return func(strOrFunc interface{}, args ...interface{}) {
 		if !enabled {
 			return
 		}
 
 		if !reg.MatchString(name) {
 			return
+		}
+
+		var format, isString = strOrFunc.(string)
+
+		if !isString {
+			lazy, isFunc := strOrFunc.(func() string)
+			if !isFunc {
+				panic("invalid first argument type for Debug, must either be a string or lazy function")
+			}
+			format = lazy()
 		}
 
 		d := deltas(prevGlobal, prev, color)
