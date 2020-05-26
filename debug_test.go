@@ -29,9 +29,9 @@ func TestDefault(t *testing.T) {
 	SetWriter(buf)
 
 	debug := Debug("foo")
-	debug("something")
-	debug("here")
-	debug("whoop")
+	debug.Debug("something")
+	debug.Debug("here")
+	debug.Debug("whoop")
 
 	if buf.Len() != 0 {
 		t.Fatalf("buffer should be empty")
@@ -44,9 +44,9 @@ func TestDefaultLazy(t *testing.T) {
 	SetWriter(buf)
 
 	debug := Debug("foo")
-	debug(func() string { return "something" })
-	debug(func() string { return "here" })
-	debug(func() string { return "whoop" })
+	debug.Debug(func() string { return "something" })
+	debug.Debug(func() string { return "here" })
+	debug.Debug(func() string { return "whoop" })
 
 	if buf.Len() != 0 {
 		t.Fatalf("buffer should be empty")
@@ -61,10 +61,10 @@ func TestEnable(t *testing.T) {
 	Enable("foo")
 
 	debug := Debug("foo")
-	debug("something")
-	debug("here")
-	debug("whoop")
-	debug(func() string { return "lazy" })
+	debug.Debug("something")
+	debug.Debug("here")
+	debug.Debug("whoop")
+	debug.Debug(func() string { return "lazy" })
 
 	if buf.Len() == 0 {
 		t.Fatalf("buffer should have output")
@@ -85,12 +85,12 @@ func TestMultipleOneEnabled(t *testing.T) {
 	Enable("foo")
 
 	foo := Debug("foo")
-	foo("foo")
-	foo(func() string { return "foo lazy" })
+	foo.Debug("foo")
+	foo.Debug(func() string { return "foo lazy" })
 
 	bar := Debug("bar")
-	bar("bar")
-	bar(func() string { return "bar lazy" })
+	bar.Debug("bar")
+	bar.Debug(func() string { return "bar lazy" })
 
 	if buf.Len() == 0 {
 		t.Fatalf("buffer should have output")
@@ -111,12 +111,12 @@ func TestMultipleEnabled(t *testing.T) {
 	Enable("foo,bar")
 
 	foo := Debug("foo")
-	foo("foo")
-	foo(func() string { return "foo lazy" })
+	foo.Debug("foo")
+	foo.Debug(func() string { return "foo lazy" })
 
 	bar := Debug("bar")
-	bar("bar")
-	bar(func() string { return "bar lazy" })
+	bar.Debug("bar")
+	bar.Debug(func() string { return "bar lazy" })
 
 	if buf.Len() == 0 {
 		t.Fatalf("buffer should have output")
@@ -138,12 +138,12 @@ func TestEnableDisable(t *testing.T) {
 	Disable()
 
 	foo := Debug("foo")
-	foo("foo")
-	foo(func() string { return "foo" })
+	foo.Debug("foo")
+	foo.Debug(func() string { return "foo" })
 
 	bar := Debug("bar")
-	bar("bar")
-	bar(func() string { return "bar" })
+	bar.Debug("bar")
+	bar.Debug(func() string { return "bar" })
 
 	if buf.Len() != 0 {
 		t.Fatalf("buffer should not have output")
@@ -161,10 +161,10 @@ func ExampleDebug() {
 	var debug = Debug("single")
 
 	for {
-		debug("sending mail")
-		debug("send email to %s", "tobi@segment.io")
-		debug("send email to %s", "loki@segment.io")
-		debug("send email to %s", "jane@segment.io")
+		debug.Debug("sending mail")
+		debug.Debug("send email to %s", "tobi@segment.io")
+		debug.Debug("send email to %s", "loki@segment.io")
+		debug.Debug("send email to %s", "jane@segment.io")
 		time.Sleep(500 * time.Millisecond)
 	}
 }
@@ -172,14 +172,14 @@ func ExampleDebug() {
 func BenchmarkDisabled(b *testing.B) {
 	debug := Debug("something")
 	for i := 0; i < b.N; i++ {
-		debug("stuff")
+		debug.Debug("stuff")
 	}
 }
 
 func BenchmarkDisabledLazy(b *testing.B) {
 	debug := Debug("something")
 	for i := 0; i < b.N; i++ {
-		debug(func() string { return "lazy" })
+		debug.Debug(func() string { return "lazy" })
 	}
 }
 
@@ -187,7 +187,7 @@ func BenchmarkNonMatch(b *testing.B) {
 	debug := Debug("something")
 	Enable("nonmatch")
 	for i := 0; i < b.N; i++ {
-		debug("stuff")
+		debug.Debug("stuff")
 	}
 }
 
@@ -199,7 +199,7 @@ func BenchmarkLargeNonMatch(b *testing.B) {
 
 	Enable("nonmatch")
 	for i := 0; i < b.N; i++ {
-		debug(string(file))
+		debug.Debug(string(file))
 	}
 }
 
@@ -211,7 +211,7 @@ func BenchmarkLargeLazyNonMatch(b *testing.B) {
 
 	Enable("nonmatch")
 	for i := 0; i < b.N; i++ {
-		debug(func() string {
+		debug.Debug(func() string {
 			return string(file)
 		})
 	}
@@ -225,7 +225,7 @@ func BenchmarkLargeLazyMatch(b *testing.B) {
 
 	Enable("large:lazy")
 	for i := 0; i < b.N; i++ {
-		debug(func() string {
+		debug.Debug(func() string {
 			return string(file)
 		})
 	}

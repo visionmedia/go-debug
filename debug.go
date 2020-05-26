@@ -22,6 +22,11 @@ var (
 // Debugger function.
 type DebugFunction func(interface{}, ...interface{})
 
+type Debugger struct {
+	Debug DebugFunction
+	Spawn func(ns string) Debugger
+}
+
 // Terminal colors used at random.
 var colors []string = []string{
 	"31",
@@ -75,12 +80,18 @@ func Enable(pattern string) {
 
 // Debug creates a debug function for `name` which you call
 // with printf-style arguments in your application or library.
-func Debug(name string) DebugFunction {
+func Debug(name string) Debugger {
 	prevGlobal := time.Now()
 	color := colors[rand.Intn(len(colors))]
 	prev := time.Now()
 
-	return func(strOrFunc interface{}, args ...interface{}) {
+	dbg := Debugger{}
+
+	dbg.Spawn = func(ns string) Debugger {
+		return Debug(name + ":" + ns)
+	}
+
+	dbg.Debug = func(strOrFunc interface{}, args ...interface{}) {
 		if !enabled {
 			return
 		}
@@ -104,6 +115,8 @@ func Debug(name string) DebugFunction {
 		prevGlobal = time.Now()
 		prev = time.Now()
 	}
+
+	return dbg
 }
 
 // Return formatting for deltas.
