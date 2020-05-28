@@ -106,6 +106,7 @@ func Debug(name string) Debugger {
 
 		if len(args) >= 1 {
 			strOrFunc = args[0]
+			args = args[1:]
 
 			format, isString = strOrFunc.(string)
 
