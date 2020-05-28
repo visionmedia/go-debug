@@ -217,6 +217,18 @@ func BenchmarkLargeLazyNonMatch(b *testing.B) {
 	}
 }
 
+func BenchmarkLargeMatch(b *testing.B) {
+	debug := Debug("large:lazy")
+
+	abs, _ := filepath.Abs("./crashes.json")
+	file := GetFileBytes(abs)
+
+	Enable("large:lazy")
+	for i := 0; i < b.N; i++ {
+		debug.Log(string(file))
+	}
+}
+
 func BenchmarkLargeLazyMatch(b *testing.B) {
 	debug := Debug("large:lazy")
 
