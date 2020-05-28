@@ -129,6 +129,34 @@ func TestMultipleEnabled(t *testing.T) {
 	assertContains(t, str, "bar lazy")
 }
 
+func TestSpawnMultipleEnabled(t *testing.T) {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	SetWriter(buf)
+
+	Enable("foo*,bar*")
+
+	foo := Debug("foo").Spawn("child").Spawn("granChild")
+	foo.Log("foo")
+	foo.Log(func() string { return "foo lazy" })
+
+	bar := Debug("bar").Spawn("child").Spawn("granChild")
+	bar.Log("bar")
+	bar.Log(func() string { return "bar lazy" })
+
+	if buf.Len() == 0 {
+		t.Fatalf("buffer should have output")
+	}
+
+	str := string(buf.Bytes())
+	assertContains(t, str, "foo:child:granChild")
+	assertContains(t, str, "foo")
+	assertContains(t, str, "foo lazy")
+	assertContains(t, str, "bar:child:granChild")
+	assertContains(t, str, "bar")
+	assertContains(t, str, "bar lazy")
+}
+
 func TestEnableDisable(t *testing.T) {
 	var b []byte
 	buf := bytes.NewBuffer(b)
@@ -142,6 +170,27 @@ func TestEnableDisable(t *testing.T) {
 	foo.Log(func() string { return "foo" })
 
 	bar := Debug("bar")
+	bar.Log("bar")
+	bar.Log(func() string { return "bar" })
+
+	if buf.Len() != 0 {
+		t.Fatalf("buffer should not have output")
+	}
+}
+
+func TestSpawnEnableDisable(t *testing.T) {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	SetWriter(buf)
+
+	Enable("foo*,bar*")
+	Disable()
+
+	foo := Debug("foo").Spawn("child").Spawn("grandChild")
+	foo.Log("foo")
+	foo.Log(func() string { return "foo" })
+
+	bar := Debug("bar").Spawn("child").Spawn("grandChild")
 	bar.Log("bar")
 	bar.Log(func() string { return "bar" })
 
