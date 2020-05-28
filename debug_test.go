@@ -1,9 +1,15 @@
 package debug
 
-import "testing"
-import "strings"
-import "bytes"
-import "time"
+import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
 
 func assertContains(t *testing.T, str, substr string) {
 	if !strings.Contains(str, substr) {
@@ -32,6 +38,21 @@ func TestDefault(t *testing.T) {
 	}
 }
 
+func TestDefaultLazy(t *testing.T) {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	SetWriter(buf)
+
+	debug := Debug("foo")
+	debug(func() string { return "something" })
+	debug(func() string { return "here" })
+	debug(func() string { return "whoop" })
+
+	if buf.Len() != 0 {
+		t.Fatalf("buffer should be empty")
+	}
+}
+
 func TestEnable(t *testing.T) {
 	var b []byte
 	buf := bytes.NewBuffer(b)
@@ -43,6 +64,7 @@ func TestEnable(t *testing.T) {
 	debug("something")
 	debug("here")
 	debug("whoop")
+	debug(func() string { return "lazy" })
 
 	if buf.Len() == 0 {
 		t.Fatalf("buffer should have output")
@@ -52,6 +74,7 @@ func TestEnable(t *testing.T) {
 	assertContains(t, str, "something")
 	assertContains(t, str, "here")
 	assertContains(t, str, "whoop")
+	assertContains(t, str, "lazy")
 }
 
 func TestMultipleOneEnabled(t *testing.T) {
@@ -63,9 +86,11 @@ func TestMultipleOneEnabled(t *testing.T) {
 
 	foo := Debug("foo")
 	foo("foo")
+	foo(func() string { return "foo lazy" })
 
 	bar := Debug("bar")
 	bar("bar")
+	bar(func() string { return "bar lazy" })
 
 	if buf.Len() == 0 {
 		t.Fatalf("buffer should have output")
@@ -73,7 +98,9 @@ func TestMultipleOneEnabled(t *testing.T) {
 
 	str := string(buf.Bytes())
 	assertContains(t, str, "foo")
+	assertContains(t, str, "foo lazy")
 	assertNotContains(t, str, "bar")
+	assertNotContains(t, str, "bar lazy")
 }
 
 func TestMultipleEnabled(t *testing.T) {
@@ -85,9 +112,11 @@ func TestMultipleEnabled(t *testing.T) {
 
 	foo := Debug("foo")
 	foo("foo")
+	foo(func() string { return "foo lazy" })
 
 	bar := Debug("bar")
 	bar("bar")
+	bar(func() string { return "bar lazy" })
 
 	if buf.Len() == 0 {
 		t.Fatalf("buffer should have output")
@@ -95,7 +124,9 @@ func TestMultipleEnabled(t *testing.T) {
 
 	str := string(buf.Bytes())
 	assertContains(t, str, "foo")
+	assertContains(t, str, "foo lazy")
 	assertContains(t, str, "bar")
+	assertContains(t, str, "bar lazy")
 }
 
 func TestEnableDisable(t *testing.T) {
@@ -108,9 +139,11 @@ func TestEnableDisable(t *testing.T) {
 
 	foo := Debug("foo")
 	foo("foo")
+	foo(func() string { return "foo" })
 
 	bar := Debug("bar")
 	bar("bar")
+	bar(func() string { return "bar" })
 
 	if buf.Len() != 0 {
 		t.Fatalf("buffer should not have output")
@@ -143,10 +176,70 @@ func BenchmarkDisabled(b *testing.B) {
 	}
 }
 
+func BenchmarkDisabledLazy(b *testing.B) {
+	debug := Debug("something")
+	for i := 0; i < b.N; i++ {
+		debug(func() string { return "lazy" })
+	}
+}
+
 func BenchmarkNonMatch(b *testing.B) {
 	debug := Debug("something")
 	Enable("nonmatch")
 	for i := 0; i < b.N; i++ {
 		debug("stuff")
 	}
+}
+
+func BenchmarkLargeNonMatch(b *testing.B) {
+	debug := Debug("large:not:lazy")
+
+	abs, _ := filepath.Abs("./crashes.json")
+	file := GetFileBytes(abs)
+
+	Enable("nonmatch")
+	for i := 0; i < b.N; i++ {
+		debug(string(file))
+	}
+}
+
+func BenchmarkLargeLazyNonMatch(b *testing.B) {
+	debug := Debug("large:lazy")
+
+	abs, _ := filepath.Abs("./crashes.json")
+	file := GetFileBytes(abs)
+
+	Enable("nonmatch")
+	for i := 0; i < b.N; i++ {
+		debug(func() string {
+			return string(file)
+		})
+	}
+}
+
+func BenchmarkLargeLazyMatch(b *testing.B) {
+	debug := Debug("large:lazy")
+
+	abs, _ := filepath.Abs("./crashes.json")
+	file := GetFileBytes(abs)
+
+	Enable("large:lazy")
+	for i := 0; i < b.N; i++ {
+		debug(func() string {
+			return string(file)
+		})
+	}
+}
+
+func GetFileBytes(filename string) []byte {
+	file, err := os.Open(filename)
+	// if we os.Open returns an error then handle it
+	if err != nil {
+		fmt.Println(err)
+	}
+	// defer the closing of our jsonFile so that we can parse it later on
+	defer file.Close()
+	bytes, _ := ioutil.ReadAll(file)
+
+	return bytes
 }
