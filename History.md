@@ -1,6 +1,6 @@
 # History
 
-## v3.0.0 / 2020-05-28 @znemz/go-debug 0.1.0
+## v3.0.0 / 2020-05-28 @znemz/go-debug 0.0.1
 
 - versioning reset due to golang's messed up module system
 - lazy logging
