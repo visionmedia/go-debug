@@ -1,0 +1,20 @@
+{
+  "name": "@znemz/go-debug",
+  "private": true,
+  "version": "3.0.0-0",
+  "description": "lambda go sample, package.json is for versioning only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nmccready/go-debug.git"
+  },
+  "keywords": [
+    "go",
+    "debug"
+  ],
+  "author": "Nicholas McCready",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nmccready/go-debug/issues"
+  },
+  "homepage": "https://github.com/nmccready/go-debug#readme"
+}
