@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	. "github.com/visionmedia/go-debug"
+	. "github.com/nmccready/go-debug"
 )
 
 var a = Debug("multiple:a")

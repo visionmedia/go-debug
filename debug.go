@@ -20,10 +20,10 @@ var (
 )
 
 // Debugger function.
-type DebugFunction func(interface{}, ...interface{})
+type DebugFunction func(...interface{})
 
 type Debugger struct {
-	Debug DebugFunction
+	Log   DebugFunction
 	Spawn func(ns string) Debugger
 }
 
@@ -91,7 +91,11 @@ func Debug(name string) Debugger {
 		return Debug(name + ":" + ns)
 	}
 
-	dbg.Debug = func(strOrFunc interface{}, args ...interface{}) {
+	dbg.Log = func(args ...interface{}) {
+		var strOrFunc interface{}
+		var format string
+		var isString bool
+
 		if !enabled {
 			return
 		}
@@ -100,14 +104,18 @@ func Debug(name string) Debugger {
 			return
 		}
 
-		var format, isString = strOrFunc.(string)
+		if len(args) >= 1 {
+			strOrFunc = args[0]
 
-		if !isString {
-			lazy, isFunc := strOrFunc.(func() string)
-			if !isFunc {
-				panic("invalid first argument type for Debug, must either be a string or lazy function")
+			format, isString = strOrFunc.(string)
+
+			if !isString {
+				lazy, isFunc := strOrFunc.(func() string)
+				if !isFunc {
+					panic("invalid first argument type for Debug, must either be a string or lazy function")
+				}
+				format = lazy()
 			}
-			format = lazy()
 		}
 
 		d := deltas(prevGlobal, prev, color)

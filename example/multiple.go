@@ -1,7 +1,10 @@
 package main
 
-import . "github.com/visionmedia/go-debug"
-import "time"
+import (
+	"time"
+
+	. "github.com/nmccready/go-debug"
+)
 
 var a = Debug("multiple:a")
 var b = Debug("multiple:b")
