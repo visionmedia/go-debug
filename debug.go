@@ -113,9 +113,11 @@ func Debug(name string) Debugger {
 			if !isString {
 				lazy, isFunc := strOrFunc.(func() string)
 				if !isFunc {
-					panic("invalid first argument type for Debug, must either be a string or lazy function")
+					// coerce to string
+					format = fmt.Sprint(strOrFunc)
+				} else {
+					format = lazy()
 				}
-				format = lazy()
 			}
 		}
 

@@ -32,6 +32,7 @@ func TestDefault(t *testing.T) {
 	debug.Log("something")
 	debug.Log("here")
 	debug.Log("whoop")
+	debug.Log(os.Args[:1]) // can log non strings
 
 	if buf.Len() != 0 {
 		t.Fatalf("buffer should be empty")
@@ -222,6 +223,22 @@ func BenchmarkDisabled(b *testing.B) {
 	debug := Debug("something")
 	for i := 0; i < b.N; i++ {
 		debug.Log("stuff")
+	}
+}
+
+func BenchmarkMatch(b *testing.B) {
+	debug := Debug("something")
+	Enable("something")
+	for i := 0; i < b.N; i++ {
+		debug.Log("stuff")
+	}
+}
+
+func BenchmarkMatchNonStringNonFunc(b *testing.B) {
+	debug := Debug("something")
+	Enable("something")
+	for i := 0; i < b.N; i++ {
+		debug.Log(os.Args[:1])
 	}
 }
 
