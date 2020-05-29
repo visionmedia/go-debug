@@ -10,9 +10,9 @@ var a = Debug("multiple:a")
 var b = Debug("multiple:b")
 var c = Debug("multiple:c")
 
-func work(debug DebugFunction, delay time.Duration) {
+func work(debug Debugger, delay time.Duration) {
 	for {
-		debug("doing stuff")
+		debug.Log("doing stuff")
 		time.Sleep(delay)
 	}
 }
