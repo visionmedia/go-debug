@@ -4,11 +4,8 @@ import (
 	"time"
 
 	. "github.com/nmccready/go-debug"
+	"github.com/nmccready/go-debug/example/rootDebug"
 )
-
-var a = Debug("multiple:a")
-var b = Debug("multiple:b")
-var c = Debug("multiple:c")
 
 func work(debug Debugger, delay time.Duration) {
 	for {
@@ -18,6 +15,11 @@ func work(debug Debugger, delay time.Duration) {
 }
 
 func main() {
+
+	var a = rootDebug.Spawn("multiple:a")
+	var b = rootDebug.Spawn("multiple:b")
+	var c = rootDebug.Spawn("multiple:c")
+
 	q := make(chan bool)
 
 	go work(a, 1000*time.Millisecond)

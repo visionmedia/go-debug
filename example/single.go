@@ -3,12 +3,11 @@ package main
 import (
 	"time"
 
-	. "github.com/nmccready/go-debug"
+	"github.com/nmccready/go-debug/example/rootDebug"
 )
 
-var debug = Debug("single")
-
 func main() {
+	var debug = rootDebug.Spawn("single")
 	for {
 		debug.Log("sending mail")
 		debug.Log("send email to %s", "tobi@segment.io")
