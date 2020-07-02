@@ -99,3 +99,11 @@ The name given _should_ be the package name, however you can use whatever you li
 ## License
 
 MIT
+
+## Development
+
+Install:
+
+- yq - `brew install yq`
+- golines - `go get -u github.com/segmentio/golines`
+- golangci-lint - `brew install golangci/tap/golangci-lint`

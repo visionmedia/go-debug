@@ -96,7 +96,6 @@ func Enable(pattern string) {
 // Debug creates a debug function for `name` which you call
 // with printf-style arguments in your application or library.
 func Debug(name string) Debugger {
-
 	entry, cached := cache.Get(name)
 
 	if cached {
