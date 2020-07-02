@@ -1,4 +1,4 @@
-# go-debug
+# go-debug [![build status][travis-image]][travis-url]
 
 Conditional debug logging for Go libraries.
 
@@ -107,3 +107,6 @@ Install:
 - yq - `brew install yq`
 - golines - `go get -u github.com/segmentio/golines`
 - golangci-lint - `brew install golangci/tap/golangci-lint`
+
+[travis-image]: https://img.shields.io/travis/nmccready/go-debug.svg
+[travis-url]: https://travis-ci.org/nmccready/go-debug
