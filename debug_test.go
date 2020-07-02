@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func assertContains(t *testing.T, str, substr string) {
@@ -71,7 +73,7 @@ func TestEnable(t *testing.T) {
 		t.Fatalf("buffer should have output")
 	}
 
-	str := string(buf.Bytes())
+	str := buf.String()
 	assertContains(t, str, "something")
 	assertContains(t, str, "here")
 	assertContains(t, str, "whoop")
@@ -97,7 +99,7 @@ func TestMultipleOneEnabled(t *testing.T) {
 		t.Fatalf("buffer should have output")
 	}
 
-	str := string(buf.Bytes())
+	str := buf.String()
 	assertContains(t, str, "foo")
 	assertContains(t, str, "foo lazy")
 	assertNotContains(t, str, "bar")
@@ -123,7 +125,7 @@ func TestMultipleEnabled(t *testing.T) {
 		t.Fatalf("buffer should have output")
 	}
 
-	str := string(buf.Bytes())
+	str := buf.String()
 	assertContains(t, str, "foo")
 	assertContains(t, str, "foo lazy")
 	assertContains(t, str, "bar")
@@ -137,11 +139,11 @@ func TestSpawnMultipleEnabled(t *testing.T) {
 
 	Enable("foo*,bar*")
 
-	foo := Debug("foo").Spawn("child").Spawn("granChild")
+	foo := Debug("foo").Spawn("child").Spawn("grandChild")
 	foo.Log("foo")
 	foo.Log(func() string { return "foo lazy" })
 
-	bar := Debug("bar").Spawn("child").Spawn("granChild")
+	bar := Debug("bar").Spawn("child").Spawn("grandChild")
 	bar.Log("bar")
 	bar.Log(func() string { return "bar lazy" })
 
@@ -149,11 +151,11 @@ func TestSpawnMultipleEnabled(t *testing.T) {
 		t.Fatalf("buffer should have output")
 	}
 
-	str := string(buf.Bytes())
-	assertContains(t, str, "foo:child:granChild")
+	str := buf.String()
+	assertContains(t, str, "foo:child:grandChild")
 	assertContains(t, str, "foo")
 	assertContains(t, str, "foo lazy")
-	assertContains(t, str, "bar:child:granChild")
+	assertContains(t, str, "bar:child:grandChild")
 	assertContains(t, str, "bar")
 	assertContains(t, str, "bar lazy")
 }
@@ -184,6 +186,8 @@ func TestSpawnEnableDisable(t *testing.T) {
 	buf := bytes.NewBuffer(b)
 	SetWriter(buf)
 
+	cache.Flush()
+
 	Enable("foo*,bar*")
 	Disable()
 
@@ -194,6 +198,12 @@ func TestSpawnEnableDisable(t *testing.T) {
 	bar := Debug("bar").Spawn("child").Spawn("grandChild")
 	bar.Log("bar")
 	bar.Log(func() string { return "bar" })
+
+	// run again to test cache to make sure it does not overflow
+	Debug("bar").Spawn("child").Spawn("grandChild")
+
+	// fmt.Println("items", cache.Items())
+	assert.Equal(t, len(cache.Items()), 6)
 
 	if buf.Len() != 0 {
 		t.Fatalf("buffer should not have output")

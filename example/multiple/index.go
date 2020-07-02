@@ -15,7 +15,6 @@ func work(debug Debugger, delay time.Duration) {
 }
 
 func main() {
-
 	var a = rootDebug.Spawn("multiple:a")
 	var b = rootDebug.Spawn("multiple:b")
 	var c = rootDebug.Spawn("multiple:c")

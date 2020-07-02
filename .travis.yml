@@ -1,0 +1,16 @@
+language: go
+
+go:
+  - 1.14.x
+
+script:
+  - go mod vendor
+  - make test
+
+cache:
+  directories:
+    - vendor
+
+branches:
+  except:
+    - /^v[0-9]/
