@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	goCache "github.com/patrickmn/go-cache"
 )
 
 var (
@@ -17,6 +19,7 @@ var (
 	reg     *regexp.Regexp
 	m       sync.Mutex
 	enabled = false
+	cache   *goCache.Cache
 )
 
 // Debugger function.
@@ -39,11 +42,23 @@ var colors []string = []string{
 
 // Initialize with DEBUG environment variable.
 func init() {
+	var err error
 	env := os.Getenv("DEBUG")
+	cacheMinStr := os.Getenv("DEBUG_CACHE_MINUTES")
+	cachedMin := 60
 
 	if "" != env {
 		Enable(env)
 	}
+
+	if cacheMinStr != "" {
+		cachedMin, err = strconv.Atoi(cacheMinStr)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	cache = goCache.New(time.Duration(cachedMin)*time.Minute, 10*time.Minute)
 }
 
 // SetWriter replaces the default of os.Stderr with `w`.
@@ -81,6 +96,14 @@ func Enable(pattern string) {
 // Debug creates a debug function for `name` which you call
 // with printf-style arguments in your application or library.
 func Debug(name string) Debugger {
+
+	entry, cached := cache.Get(name)
+
+	if cached {
+		dbg, _ := entry.(Debugger)
+		return dbg
+	}
+
 	prevGlobal := time.Now()
 	color := colors[rand.Intn(len(colors))]
 	prev := time.Now()
@@ -126,6 +149,8 @@ func Debug(name string) Debugger {
 		prevGlobal = time.Now()
 		prev = time.Now()
 	}
+
+	cache.Set(name, dbg, goCache.DefaultExpiration)
 
 	return dbg
 }
