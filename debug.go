@@ -171,7 +171,7 @@ func Debug(name string) Debugger {
 		}
 
 		d := deltas(prevGlobal, prev, color)
-		fmt.Fprintf(writer, d+wrapColor(name, color, hasColors)+" - "+format+"\n", args...)
+		fmt.Fprintf(writer, d+" "+getColorStr(color, hasColors)+name+getColorOff(hasColors)+" - "+format+"\n", args...)
 		prevGlobal = time.Now()
 		prev = time.Now()
 	}
@@ -181,11 +181,18 @@ func Debug(name string) Debugger {
 	return dbg
 }
 
-func wrapColor(str string, color string, isOn bool) string {
+func getColorStr(color string, isOn bool) string {
 	if !isOn {
-		return str
+		return ""
 	}
-	return " \033[" + color + "m" + str + "\033[0m"
+	return "\033[" + color + "m"
+}
+
+func getColorOff(isOn bool) string {
+	if !isOn {
+		return ""
+	}
+	return "\033[0m"
 }
 
 // Return formatting for deltas.
@@ -194,7 +201,7 @@ func deltas(prevGlobal, prev time.Time, color string) string {
 	global := now.Sub(prevGlobal).Nanoseconds()
 	delta := now.Sub(prev).Nanoseconds()
 	ts := now.UTC().Format("15:04:05.000")
-	deltas := fmt.Sprintf("%s %-6s \033["+color+"m%-6s", ts, humanizeNano(global), humanizeNano(delta))
+	deltas := fmt.Sprintf("%s %-6s "+getColorStr(color, hasColors)+"%-6s", ts, humanizeNano(global), humanizeNano(delta))
 	return deltas
 }
 

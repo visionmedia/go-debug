@@ -87,8 +87,7 @@ func TestColorsEnable(t *testing.T) {
 
 	str := buf.String()
 	assert.Contains(t, str, "something")
-	assert.Contains(t, str, wrapColor("something", colors[0], true))
-	assert.NotEqual(t, str, wrapColor("something", colors[0], true), wrapColor("something", colors[0], false))
+	assert.Contains(t, str, getColorStr(colors[0], true))
 	assert.Contains(t, str, "\033")
 }
 
@@ -110,7 +109,7 @@ func TestColorsDisable(t *testing.T) {
 	str := buf.String()
 	fmt.Println("str: ", str)
 	assert.Contains(t, str, "something")
-	assert.Contains(t, str, wrapColor("something", colors[0], false))
+	assert.NotContains(t, str, getColorStr(colors[0], true))
 
 	SetHasColors(true)
 }
