@@ -15,11 +15,12 @@ import (
 )
 
 var (
-	writer  io.Writer = os.Stderr
-	reg     *regexp.Regexp
-	m       sync.Mutex
-	enabled = false
-	cache   *goCache.Cache
+	writer    io.Writer = os.Stderr
+	reg       *regexp.Regexp
+	m         sync.Mutex
+	enabled   = false
+	cache     *goCache.Cache
+	hasColors = true
 )
 
 // Debugger function.
@@ -42,23 +43,21 @@ var colors []string = []string{
 
 // Initialize with DEBUG environment variable.
 func init() {
-	var err error
 	env := os.Getenv("DEBUG")
 	cacheMinStr := os.Getenv("DEBUG_CACHE_MINUTES")
-	cachedMin := 60
+	colorOffStr := os.Getenv("DEBUG_COLOR_OFF")
 
 	if "" != env {
 		Enable(env)
 	}
 
-	if cacheMinStr != "" {
-		cachedMin, err = strconv.Atoi(cacheMinStr)
-		if err != nil {
-			panic(err)
-		}
-	}
+	SetHasColors(colorOffStr == "")
 
-	cache = goCache.New(time.Duration(cachedMin)*time.Minute, 10*time.Minute)
+	err := SetCache(cacheMinStr)
+
+	if err != nil {
+		panic(err)
+	}
 }
 
 // SetWriter replaces the default of os.Stderr with `w`.
@@ -75,13 +74,15 @@ func Disable() {
 	enabled = false
 }
 
-// Enable the given debug `pattern`. Patterns take a glob-like form,
-// for example if you wanted to enable everything, just use "*", or
-// if you had a library named mongodb you could use "mongodb:connection",
-// or "mongodb:*". Multiple matches can be made with a comma, for
-// example "mongo*,redis*".
-//
-// This function is thread-safe.
+/*
+	Enable the given debug `pattern`. Patterns take a glob-like form,
+	for example if you wanted to enable everything, just use "*", or
+	if you had a library named mongodb you could use "mongodb:connection",
+	or "mongodb:*". Multiple matches can be made with a comma, for
+	example "mongo*,redis*".
+
+	This function is thread-safe.
+*/
 func Enable(pattern string) {
 	m.Lock()
 	defer m.Unlock()
@@ -91,6 +92,32 @@ func Enable(pattern string) {
 	pattern = "^(" + pattern + ")$"
 	reg = regexp.MustCompile(pattern)
 	enabled = true
+}
+
+/*
+	Initialize the namespace cache which defaults to 60 min lifespan
+*/
+func SetCache(cacheMinStr string) error {
+	var err error
+	cachedMin := 60
+
+	m.Lock()
+	defer m.Unlock()
+	if cacheMinStr != "" {
+		cachedMin, err = strconv.Atoi(cacheMinStr)
+		if err != nil {
+			return err
+		}
+	}
+
+	cache = goCache.New(time.Duration(cachedMin)*time.Minute, 10*time.Minute)
+	return nil
+}
+
+func SetHasColors(onOff bool) {
+	m.Lock()
+	defer m.Unlock()
+	hasColors = onOff
 }
 
 // Debug creates a debug function for `name` which you call
@@ -144,7 +171,7 @@ func Debug(name string) Debugger {
 		}
 
 		d := deltas(prevGlobal, prev, color)
-		fmt.Fprintf(writer, d+" \033["+color+"m"+name+"\033[0m - "+format+"\n", args...)
+		fmt.Fprintf(writer, d+wrapColor(name, color, hasColors)+" - "+format+"\n", args...)
 		prevGlobal = time.Now()
 		prev = time.Now()
 	}
@@ -152,6 +179,13 @@ func Debug(name string) Debugger {
 	cache.Set(name, dbg, goCache.DefaultExpiration)
 
 	return dbg
+}
+
+func wrapColor(str string, color string, isOn bool) string {
+	if !isOn {
+		return str
+	}
+	return " \033[" + color + "m" + str + "\033[0m"
 }
 
 // Return formatting for deltas.

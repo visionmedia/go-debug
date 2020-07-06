@@ -6,23 +6,14 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func assertContains(t *testing.T, str, substr string) {
-	if !strings.Contains(str, substr) {
-		t.Fatalf("expected %q to contain %q", str, substr)
-	}
-}
-
-func assertNotContains(t *testing.T, str, substr string) {
-	if strings.Contains(str, substr) {
-		t.Fatalf("expected %q to not contain %q", str, substr)
-	}
+func TestMain(t *testing.M) {
+	colors = []string{"31"}
 }
 
 func TestDefault(t *testing.T) {
@@ -74,10 +65,54 @@ func TestEnable(t *testing.T) {
 	}
 
 	str := buf.String()
-	assertContains(t, str, "something")
-	assertContains(t, str, "here")
-	assertContains(t, str, "whoop")
-	assertContains(t, str, "lazy")
+	assert.Contains(t, str, "something")
+	assert.Contains(t, str, "here")
+	assert.Contains(t, str, "whoop")
+	assert.Contains(t, str, "lazy")
+}
+
+func TestColorsEnable(t *testing.T) {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	SetWriter(buf)
+
+	Enable("foo")
+
+	debug := Debug("foo")
+	debug.Log("something")
+
+	if buf.Len() == 0 {
+		t.Fatalf("buffer should have output")
+	}
+
+	str := buf.String()
+	assert.Contains(t, str, "something")
+	assert.Contains(t, str, wrapColor("something", colors[0], true))
+	assert.NotEqual(t, str, wrapColor("something", colors[0], true), wrapColor("something", colors[0], false))
+	assert.Contains(t, str, "\033")
+}
+
+func TestColorsDisable(t *testing.T) {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	SetWriter(buf)
+
+	Enable("foo")
+	SetHasColors(false)
+
+	debug := Debug("foo")
+	debug.Log("something")
+
+	if buf.Len() == 0 {
+		t.Fatalf("buffer should have output")
+	}
+
+	str := buf.String()
+	fmt.Println("str: ", str)
+	assert.Contains(t, str, "something")
+	assert.Contains(t, str, wrapColor("something", colors[0], false))
+
+	SetHasColors(true)
 }
 
 func TestMultipleOneEnabled(t *testing.T) {
@@ -100,10 +135,10 @@ func TestMultipleOneEnabled(t *testing.T) {
 	}
 
 	str := buf.String()
-	assertContains(t, str, "foo")
-	assertContains(t, str, "foo lazy")
-	assertNotContains(t, str, "bar")
-	assertNotContains(t, str, "bar lazy")
+	assert.Contains(t, str, "foo")
+	assert.Contains(t, str, "foo lazy")
+	assert.NotContains(t, str, "bar")
+	assert.NotContains(t, str, "bar lazy")
 }
 
 func TestMultipleEnabled(t *testing.T) {
@@ -126,10 +161,10 @@ func TestMultipleEnabled(t *testing.T) {
 	}
 
 	str := buf.String()
-	assertContains(t, str, "foo")
-	assertContains(t, str, "foo lazy")
-	assertContains(t, str, "bar")
-	assertContains(t, str, "bar lazy")
+	assert.Contains(t, str, "foo")
+	assert.Contains(t, str, "foo lazy")
+	assert.Contains(t, str, "bar")
+	assert.Contains(t, str, "bar lazy")
 }
 
 func TestSpawnMultipleEnabled(t *testing.T) {
@@ -152,12 +187,12 @@ func TestSpawnMultipleEnabled(t *testing.T) {
 	}
 
 	str := buf.String()
-	assertContains(t, str, "foo:child:grandChild")
-	assertContains(t, str, "foo")
-	assertContains(t, str, "foo lazy")
-	assertContains(t, str, "bar:child:grandChild")
-	assertContains(t, str, "bar")
-	assertContains(t, str, "bar lazy")
+	assert.Contains(t, str, "foo:child:grandChild")
+	assert.Contains(t, str, "foo")
+	assert.Contains(t, str, "foo lazy")
+	assert.Contains(t, str, "bar:child:grandChild")
+	assert.Contains(t, str, "bar")
+	assert.Contains(t, str, "bar lazy")
 }
 
 func TestEnableDisable(t *testing.T) {
