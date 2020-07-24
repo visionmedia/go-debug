@@ -20,13 +20,24 @@ var (
 	m         sync.Mutex
 	enabled   = false
 	cache     *goCache.Cache
-	hasColors = true
+	hasColors           = true
+	hasTime             = true
+	formatter Formatter = &TextFormatter{}
 )
 
 // Debugger function.
 type DebugFunction func(...interface{})
 
+type Fields map[string]interface{}
+
 type Debugger struct {
+	name       string
+	prevGlobal time.Time
+	prev       time.Time
+	fields     Fields
+	WithFields func(map[string]interface{}) Debugger
+	color      string
+
 	Log   DebugFunction
 	Spawn func(ns string) Debugger
 }
@@ -46,12 +57,14 @@ func init() {
 	env := os.Getenv("DEBUG")
 	cacheMinStr := os.Getenv("DEBUG_CACHE_MINUTES")
 	colorOffStr := os.Getenv("DEBUG_COLOR_OFF")
+	timeOffStr := os.Getenv("DEBUG_TIME_OFF")
 
 	if "" != env {
 		Enable(env)
 	}
 
 	SetHasColors(colorOffStr == "")
+	SetHasTime(timeOffStr == "")
 
 	err := SetCache(cacheMinStr)
 
@@ -114,11 +127,21 @@ func SetCache(cacheMinStr string) error {
 	return nil
 }
 
-func SetHasColors(onOff bool) {
-	m.Lock()
-	defer m.Unlock()
-	hasColors = onOff
+func setBoolWithLock(work func(bool)) func(bool) {
+	return func(isOn bool) {
+		m.Lock()
+		defer m.Unlock()
+		work(isOn)
+	}
 }
+
+var SetHasColors = setBoolWithLock(func(isOn bool) {
+	hasColors = isOn
+})
+
+var SetHasTime = setBoolWithLock(func(isOn bool) {
+	hasTime = isOn
+})
 
 // Debug creates a debug function for `name` which you call
 // with printf-style arguments in your application or library.
@@ -130,11 +153,12 @@ func Debug(name string) Debugger {
 		return dbg
 	}
 
-	prevGlobal := time.Now()
-	color := colors[rand.Intn(len(colors))]
-	prev := time.Now()
-
 	dbg := Debugger{}
+
+	dbg.name = name
+	dbg.prevGlobal = time.Now()
+	dbg.color = colors[rand.Intn(len(colors))]
+	dbg.prev = time.Now()
 
 	dbg.Spawn = func(ns string) Debugger {
 		return Debug(name + ":" + ns)
@@ -142,7 +166,7 @@ func Debug(name string) Debugger {
 
 	dbg.Log = func(args ...interface{}) {
 		var strOrFunc interface{}
-		var format string
+		var msg string
 		var isString bool
 
 		if !enabled {
@@ -157,23 +181,28 @@ func Debug(name string) Debugger {
 			strOrFunc = args[0]
 			args = args[1:]
 
-			format, isString = strOrFunc.(string)
+			msg, isString = strOrFunc.(string)
 
 			if !isString {
 				lazy, isFunc := strOrFunc.(func() string)
 				if !isFunc {
 					// coerce to string
-					format = fmt.Sprint(strOrFunc)
+					msg = fmt.Sprint(strOrFunc)
 				} else {
-					format = lazy()
+					msg = lazy()
 				}
 			}
 		}
 
-		d := deltas(prevGlobal, prev, color)
-		fmt.Fprintf(writer, d+" "+getColorStr(color, hasColors)+name+getColorOff(hasColors)+" - "+format+"\n", args...)
-		prevGlobal = time.Now()
-		prev = time.Now()
+		dbg.WithFields = func(fields map[string]interface{}) Debugger {
+			return dbg.Spawn("junk")
+		}
+
+		preppedMsg := formatter.Format(&dbg, msg)
+
+		fmt.Fprintf(writer, preppedMsg, args...)
+		dbg.prevGlobal = time.Now()
+		dbg.prev = time.Now()
 	}
 
 	cache.Set(name, dbg, goCache.DefaultExpiration)
@@ -193,6 +222,15 @@ func getColorOff(isOn bool) string {
 		return ""
 	}
 	return "\033[0m"
+}
+
+func getTime(prevGlobal time.Time, prev time.Time, color string, isOn bool) string {
+	if !isOn {
+		return ""
+	}
+	d := deltas(prevGlobal, prev, color)
+
+	return d
 }
 
 // Return formatting for deltas.
