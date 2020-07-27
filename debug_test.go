@@ -12,8 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(t *testing.M) {
+func TestMain(m *testing.M) {
 	colors = []string{"31"}
+	os.Exit(m.Run())
 }
 
 func TestDefault(t *testing.T) {
