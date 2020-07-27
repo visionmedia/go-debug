@@ -16,8 +16,7 @@ func work(debug Debugger, delay time.Duration) {
 
 func main() {
 	SetFormatter(&TextFormatter{HasFieldsOnly: true})
-	var a = rootDebug.Spawn("multiple:a")
-	a.WithFields(Fields{
+	a := rootDebug.Spawn("multiple:a").WithFields(Fields{
 		"junk":     "hi junk",
 		"another":  1,
 		"another2": 2,

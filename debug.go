@@ -37,7 +37,7 @@ type Debugger struct {
 type IDebugger interface {
 	Log(...interface{})
 	Spawn(ns string) Debugger
-	WithFields(fields map[string]interface{}) *Debugger
+	WithFields(fields map[string]interface{}) Debugger
 }
 
 // Terminal colors used at random.
@@ -164,10 +164,10 @@ func Debug(name string) Debugger {
 	dbg.color = colors[rand.Intn(len(colors))]
 
 	if formatter.GetHasFieldsOnly() {
-		dbg.WithFields(map[string]interface{}{"namespace": name, "msg": nil})
+		dbg = dbg.WithFields(map[string]interface{}{"namespace": name, "msg": nil})
 
 		if hasTime {
-			dbg.WithFields(map[string]interface{}{"time": nil, "delta": nil})
+			dbg = dbg.WithFields(map[string]interface{}{"time": nil, "delta": nil})
 		}
 	}
 
@@ -216,16 +216,16 @@ func (dbg Debugger) Log(args ...interface{}) {
 	dbg.prev = time.Now()
 }
 
-func (dbg Debugger) WithFields(fields map[string]interface{}) *Debugger {
+func (dbg Debugger) WithFields(fields map[string]interface{}) Debugger {
 	if len(dbg.fields) == 0 {
 		dbg.fields = fields
-		return &dbg
+		return dbg
 	}
 
 	for k, v := range fields {
 		dbg.fields[k] = v
 	}
-	return &dbg
+	return dbg
 }
 
 func getColorStr(color string, isOn bool) string {

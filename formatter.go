@@ -35,10 +35,6 @@ func (t *TextFormatter) Format(dbg *Debugger, msg string) string {
 	timestring, delta := deltas(dbg.prev)
 	ns := getColorStr(color, hasColors) + dbg.name + getColorOff(hasColors)
 
-	if !t.HasFieldsOnly {
-		mainMsg = basicFormat(timestring, delta, ns, msg)
-	}
-
 	fields := ""
 
 	var keys []string
@@ -69,6 +65,13 @@ func (t *TextFormatter) Format(dbg *Debugger, msg string) string {
 		fields = t.appendKeyValue(fields, k, v)
 	}
 
+	if !t.HasFieldsOnly {
+		mainMsg = basicFormat(timestring, delta, ns, msg)
+		if fields != "" {
+			fields = "    " + fields
+		}
+	}
+
 	if fields != "" {
 		fields += "\n"
 	}
@@ -94,10 +97,10 @@ func (f *TextFormatter) appendKeyValue(s string, key string, value interface{}) 
 	if len(s) > 0 {
 		s += " "
 	}
-	return fmt.Sprintf("%s%s=%s", s, key, f.appendValue(s, key, value))
+	return fmt.Sprintf("%s%s=%s", s, key, f.appendValue(key, value))
 }
 
-func (f *TextFormatter) appendValue(s string, key string, value interface{}) string {
+func (f *TextFormatter) appendValue(key string, value interface{}) string {
 	stringVal, ok := value.(string)
 	if !ok {
 		stringVal = fmt.Sprint(value)
