@@ -1,4 +1,4 @@
-.PHONY: help test report bench lint
+.PHONY: help test report bench lint tidy
 
 LINE_LENGTH=$(shell yq r .golangci.yml linters-settings.lll.line-length)
 
@@ -17,3 +17,9 @@ bench: ## benchmark tests
 lint: ## Run the linter
 	@golines -m $(LINE_LENGTH) . -w --ignored-dirs=vendor
 	@golangci-lint run --fix
+
+tidy: ## clean up vendoring
+	@go mod vendor
+	@go mod tidy
+	@go mod verify
+	@git add go.mod go.sum
