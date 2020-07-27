@@ -174,7 +174,10 @@ func TestSpawnMultipleEnabled(t *testing.T) {
 
 	Enable("foo*,bar*")
 
-	foo := Debug("foo").Spawn("child").Spawn("grandChild")
+	//nolint
+	var foo IDebugger
+
+	foo = Debug("foo").Spawn("child").Spawn("grandChild")
 	foo.Log("foo")
 	foo.Log(func() string { return "foo lazy" })
 

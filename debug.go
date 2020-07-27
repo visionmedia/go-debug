@@ -25,21 +25,19 @@ var (
 	formatter Formatter = &TextFormatter{}
 )
 
-// Debugger function.
-type DebugFunction func(...interface{})
-
 type Fields map[string]interface{}
 
 type Debugger struct {
-	name       string
-	prevGlobal time.Time
-	prev       time.Time
-	fields     Fields
-	WithFields func(map[string]interface{}) Debugger
-	color      string
+	name   string
+	prev   time.Time
+	fields Fields
+	color  string
+}
 
-	Log   DebugFunction
-	Spawn func(ns string) Debugger
+type IDebugger interface {
+	Log(...interface{})
+	Spawn(ns string) Debugger
+	WithFields(fields map[string]interface{}) *Debugger
 }
 
 // Terminal colors used at random.
@@ -85,6 +83,12 @@ func Disable() {
 	m.Lock()
 	defer m.Unlock()
 	enabled = false
+}
+
+func SetFormatter(f Formatter) {
+	m.Lock()
+	defer m.Unlock()
+	formatter = f
 }
 
 /*
@@ -156,58 +160,72 @@ func Debug(name string) Debugger {
 	dbg := Debugger{}
 
 	dbg.name = name
-	dbg.prevGlobal = time.Now()
-	dbg.color = colors[rand.Intn(len(colors))]
 	dbg.prev = time.Now()
+	dbg.color = colors[rand.Intn(len(colors))]
 
-	dbg.Spawn = func(ns string) Debugger {
-		return Debug(name + ":" + ns)
-	}
+	if formatter.GetHasFieldsOnly() {
+		dbg.WithFields(map[string]interface{}{"namespace": name, "msg": nil})
 
-	dbg.Log = func(args ...interface{}) {
-		var strOrFunc interface{}
-		var msg string
-		var isString bool
-
-		if !enabled {
-			return
+		if hasTime {
+			dbg.WithFields(map[string]interface{}{"time": nil, "delta": nil})
 		}
-
-		if !reg.MatchString(name) {
-			return
-		}
-
-		if len(args) >= 1 {
-			strOrFunc = args[0]
-			args = args[1:]
-
-			msg, isString = strOrFunc.(string)
-
-			if !isString {
-				lazy, isFunc := strOrFunc.(func() string)
-				if !isFunc {
-					// coerce to string
-					msg = fmt.Sprint(strOrFunc)
-				} else {
-					msg = lazy()
-				}
-			}
-		}
-
-		dbg.WithFields = func(fields map[string]interface{}) Debugger {
-			return dbg.Spawn("junk")
-		}
-
-		preppedMsg := formatter.Format(&dbg, msg)
-
-		fmt.Fprintf(writer, preppedMsg, args...)
-		dbg.prevGlobal = time.Now()
-		dbg.prev = time.Now()
 	}
 
 	cache.Set(name, dbg, goCache.DefaultExpiration)
 
 	return dbg
+}
+
+func (dbg Debugger) Spawn(ns string) Debugger {
+	return Debug(dbg.name + ":" + ns)
+}
+
+func (dbg Debugger) Log(args ...interface{}) {
+	var strOrFunc interface{}
+	var msg string
+	var isString bool
+
+	if !enabled {
+		return
+	}
+
+	if !reg.MatchString(dbg.name) {
+		return
+	}
+
+	if len(args) >= 1 {
+		strOrFunc = args[0]
+		args = args[1:]
+
+		msg, isString = strOrFunc.(string)
+
+		if !isString {
+			lazy, isFunc := strOrFunc.(func() string)
+			if !isFunc {
+				// coerce to string
+				msg = fmt.Sprint(strOrFunc)
+			} else {
+				msg = lazy()
+			}
+		}
+	}
+
+	preppedMsg := formatter.Format(&dbg, msg)
+
+	fmt.Fprintf(writer, preppedMsg, args...)
+	dbg.prev = time.Now()
+}
+
+func (dbg Debugger) WithFields(fields map[string]interface{}) *Debugger {
+	if len(dbg.fields) == 0 {
+		dbg.fields = fields
+		return &dbg
+	}
+
+	for k, v := range fields {
+		dbg.fields[k] = v
+	}
+	return &dbg
 }
 
 func getColorStr(color string, isOn bool) string {
@@ -224,23 +242,20 @@ func getColorOff(isOn bool) string {
 	return "\033[0m"
 }
 
-func getTime(prevGlobal time.Time, prev time.Time, color string, isOn bool) string {
+func getTime(timestring string, delta string, isOn bool) string {
 	if !isOn {
 		return ""
 	}
-	d := deltas(prevGlobal, prev, color)
 
-	return d
+	return fmt.Sprintf("%s %-6s", timestring, delta)
 }
 
 // Return formatting for deltas.
-func deltas(prevGlobal, prev time.Time, color string) string {
+func deltas(prev time.Time) (string, string) {
 	now := time.Now()
-	global := now.Sub(prevGlobal).Nanoseconds()
 	delta := now.Sub(prev).Nanoseconds()
 	ts := now.UTC().Format("15:04:05.000")
-	deltas := fmt.Sprintf("%s %-6s "+getColorStr(color, hasColors)+"%-6s", ts, humanizeNano(global), humanizeNano(delta))
-	return deltas
+	return ts, humanizeNano(delta)
 }
 
 // Humanize nanoseconds to a string.

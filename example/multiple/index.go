@@ -16,6 +16,13 @@ func work(debug Debugger, delay time.Duration) {
 
 func main() {
 	var a = rootDebug.Spawn("multiple:a")
+	a.WithFields(Fields{
+		"junk":     "hi junk",
+		"another":  1,
+		"another2": 2,
+		"junk1":    "hi junk1",
+	})
+	// fmt.Printf("fields %s\n", a.)
 	var b = rootDebug.Spawn("multiple:b")
 	var c = rootDebug.Spawn("multiple:c")
 
