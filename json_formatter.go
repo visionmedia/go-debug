@@ -13,7 +13,7 @@ type JSONFormatter struct {
 	TimestampFormat string
 
 	// DisableTimestamp allows disabling automatic timestamps in output
-	DisableTimestamp bool
+	// DisableTimestamp bool
 
 	// DisableHTMLEscape allows disabling html escaping in output
 	DisableHTMLEscape bool

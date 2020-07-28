@@ -36,7 +36,6 @@ func (t *TextFormatter) Format(dbg *Debugger, msg string) string {
 
 	finalized := finalizeFields(dbg, msg, HAS_COLORS && t.HasColor, func(k string, v interface{}) interface{} {
 		keys = append(keys, k)
-		fields = t.appendKeyValue(fields, k, v)
 		return nil
 	})
 
@@ -44,6 +43,12 @@ func (t *TextFormatter) Format(dbg *Debugger, msg string) string {
 		sort.Strings(keys)
 	} else {
 		t.SortingFunc(keys)
+	}
+
+	// build fields string in specified order
+	for _, k := range keys {
+		v := finalized.Fields[k]
+		fields = t.appendKeyValue(fields, k, v)
 	}
 
 	if !t.HasFieldsOnly {
@@ -57,7 +62,7 @@ func (t *TextFormatter) Format(dbg *Debugger, msg string) string {
 		fields += "\n"
 	}
 
-	return fmt.Sprintf("%s%s", mainMsg, fields)
+	return mainMsg + fields
 }
 func (t *TextFormatter) GetHasFieldsOnly() bool {
 	return t.HasFieldsOnly
@@ -65,20 +70,20 @@ func (t *TextFormatter) GetHasFieldsOnly() bool {
 
 func basicFormat(ts string, delta string, ns string, msg string) string {
 	time := getTime(ts, delta, HAS_TIME)
-	head := fmt.Sprintf("%s%s", time, ns)
+	head := time + ns
 
 	if head != "" {
 		head += " - "
 	}
 
-	return fmt.Sprintf("%s%s\n", head, msg)
+	return head + msg + "\n"
 }
 
 func (f *TextFormatter) appendKeyValue(s string, key string, value interface{}) string {
 	if len(s) > 0 {
 		s += " "
 	}
-	return fmt.Sprintf("%s%s=%s", s, key, f.appendValue(key, value))
+	return s + key + "=" + f.appendValue(key, value)
 }
 
 func (f *TextFormatter) appendValue(key string, value interface{}) string {
