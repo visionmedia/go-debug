@@ -10,6 +10,7 @@ const (
 	FieldKeyNamespace = "namespace"
 	FieldKeyTime      = "time"
 	FieldKeyDelta     = "delta"
+	FieldKeyError     = "debug_error"
 )
 
 // highly inspired by logrus
@@ -30,18 +31,15 @@ type TextFormatter struct {
 
 func (t *TextFormatter) Format(dbg *Debugger, msg string) string {
 	mainMsg := ""
-	color := dbg.color
-
-	timestring, delta := deltas(dbg.prev)
-	ns := getColorStr(color, hasColors) + dbg.name + getColorOff(hasColors)
-
 	fields := ""
 
 	var keys []string
 
-	for k := range dbg.fields {
+	finalized := finalizeFields(dbg, msg, HAS_COLORS && t.HasColor, func(k string, v interface{}) interface{} {
 		keys = append(keys, k)
-	}
+		fields = t.appendKeyValue(fields, k, v)
+		return nil
+	})
 
 	if t.SortingFunc == nil {
 		sort.Strings(keys)
@@ -49,24 +47,8 @@ func (t *TextFormatter) Format(dbg *Debugger, msg string) string {
 		t.SortingFunc(keys)
 	}
 
-	for _, k := range keys {
-		v := dbg.fields[k]
-		switch {
-		case k == FieldKeyNamespace:
-			v = ns
-		case k == FieldKeyMsg:
-			v = msg
-		case k == FieldKeyTime:
-			v = timestring
-		case k == FieldKeyDelta:
-			v = delta
-		default:
-		}
-		fields = t.appendKeyValue(fields, k, v)
-	}
-
 	if !t.HasFieldsOnly {
-		mainMsg = basicFormat(timestring, delta, ns, msg)
+		mainMsg = basicFormat(finalized.TimeString, finalized.Delta, finalized.Namespace, msg)
 		if fields != "" {
 			fields = "    " + fields
 		}
@@ -83,7 +65,7 @@ func (t *TextFormatter) GetHasFieldsOnly() bool {
 }
 
 func basicFormat(ts string, delta string, ns string, msg string) string {
-	time := getTime(ts, delta, hasTime)
+	time := getTime(ts, delta, HAS_TIME)
 	head := fmt.Sprintf("%s%s", time, ns)
 
 	if head != "" {
@@ -132,4 +114,40 @@ func (f *TextFormatter) needsQuoting(text string) bool {
 		}
 	}
 	return false
+}
+
+type Finalized struct {
+	Fields     Fields
+	Namespace  string
+	TimeString string
+	Delta      string
+}
+
+func finalizeFields(dbg *Debugger, msg string, hasColor bool, cb func(string, interface{}) interface{}) *Finalized {
+	ts, delta := deltas(dbg.prev)
+	ns := getColorStr(dbg.color, hasColor) + dbg.name + getColorOff(hasColor)
+
+	fields := Fields{}
+
+	for k, v := range dbg.fields {
+		switch {
+		case k == FieldKeyNamespace:
+			fields[k] = ns
+		case k == FieldKeyMsg:
+			fields[k] = msg
+		case k == FieldKeyTime:
+			fields[k] = ts
+		case k == FieldKeyDelta:
+			fields[k] = delta
+		default:
+			fields[k] = v
+		}
+		if cb != nil {
+			transformed := cb(k, fields[k])
+			if transformed != nil {
+				fields[k] = transformed
+			}
+		}
+	}
+	return &Finalized{Fields: fields, Namespace: ns, TimeString: ts, Delta: delta}
 }

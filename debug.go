@@ -15,14 +15,14 @@ import (
 )
 
 var (
-	writer    io.Writer = os.Stderr
-	reg       *regexp.Regexp
-	m         sync.Mutex
-	enabled   = false
-	cache     *goCache.Cache
-	hasColors           = true
-	hasTime             = true
-	formatter Formatter = &TextFormatter{}
+	writer     io.Writer = os.Stderr
+	reg        *regexp.Regexp
+	m          sync.Mutex
+	enabled    = false
+	cache      *goCache.Cache
+	HAS_COLORS           = true
+	HAS_TIME             = true
+	formatter  Formatter = &TextFormatter{HasColor: true}
 )
 
 type Fields map[string]interface{}
@@ -140,11 +140,11 @@ func setBoolWithLock(work func(bool)) func(bool) {
 }
 
 var SetHasColors = setBoolWithLock(func(isOn bool) {
-	hasColors = isOn
+	HAS_COLORS = isOn
 })
 
 var SetHasTime = setBoolWithLock(func(isOn bool) {
-	hasTime = isOn
+	HAS_TIME = isOn
 })
 
 // Debug creates a debug function for `name` which you call
@@ -166,7 +166,7 @@ func Debug(name string) Debugger {
 	if formatter.GetHasFieldsOnly() {
 		dbg = dbg.WithFields(map[string]interface{}{"namespace": name, "msg": nil})
 
-		if hasTime {
+		if HAS_TIME {
 			dbg = dbg.WithFields(map[string]interface{}{"time": nil, "delta": nil})
 		}
 	}
