@@ -49,7 +49,7 @@ func TestBasicTextFormatterFieldsStrict(t *testing.T) {
 
 	//nolint
 	reg, err := regexp.Compile(
-		`\d\d:\d\d:\d\d\.\d\d\d\s\d{1,4}(s|ms|us|ns)\s{1,3}.*foo.*-.*hello.*\n.*field=1 field2=two field3="multiple strings"`,
+		`\d\d:\d\d:\d\d\.\d\d\d\s\d{1,4}(s|ms|us|ns).*foo.*-.*hello.*\n.*field=1 field2=two field3="multiple strings"`,
 	)
 
 	assert.Nil(t, err, "regex error")
