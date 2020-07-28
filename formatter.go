@@ -21,7 +21,6 @@ type Formatter interface {
 
 type TextFormatter struct {
 	HasColor         bool
-	HasTime          bool
 	ForceQuote       bool
 	QuoteEmptyFields bool
 	DisableQuote     bool
