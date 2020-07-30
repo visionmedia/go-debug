@@ -52,7 +52,7 @@ func (t *TextFormatter) Format(dbg *Debugger, msg string) string {
 	}
 
 	if !t.HasFieldsOnly {
-		mainMsg = basicFormat(finalized.TimeString, finalized.Delta, finalized.Namespace, msg)
+		mainMsg = BasicFormat(finalized.TimeString, finalized.Delta, finalized.Namespace, msg)
 		if fields != "" {
 			fields = "    " + fields
 		}
@@ -68,7 +68,7 @@ func (t *TextFormatter) GetHasFieldsOnly() bool {
 	return t.HasFieldsOnly
 }
 
-func basicFormat(ts string, delta string, ns string, msg string) string {
+func BasicFormat(ts string, delta string, ns string, msg string) string {
 	time := getTime(ts, delta, HAS_TIME)
 	head := time + ns
 
