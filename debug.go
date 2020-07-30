@@ -17,6 +17,7 @@ import (
 var (
 	writer     io.Writer = os.Stderr
 	reg        *regexp.Regexp
+	neg        []string
 	m          sync.Mutex
 	enabled    = false
 	cache      *goCache.Cache
@@ -36,8 +37,9 @@ type Debugger struct {
 
 type IDebugger interface {
 	Log(...interface{})
-	Spawn(ns string) Debugger
-	WithFields(fields map[string]interface{}) Debugger
+	Spawn(ns string) *Debugger
+	WithFields(fields map[string]interface{}) *Debugger
+	WithField(key string, value interface{}) *Debugger
 }
 
 // Terminal colors used at random.
@@ -103,12 +105,52 @@ func SetFormatter(f Formatter) {
 func Enable(pattern string) {
 	m.Lock()
 	defer m.Unlock()
-	pattern = regexp.QuoteMeta(pattern)
-	pattern = strings.Replace(pattern, "\\*", ".*?", -1)
-	pattern = strings.Replace(pattern, ",", "|", -1)
-	pattern = "^(" + pattern + ")$"
+	pattern, neg = BuildPattern(pattern)
 	reg = regexp.MustCompile(pattern)
 	enabled = true
+}
+
+func BuildPattern(pattern string) (string, []string) {
+	pattern = regexp.QuoteMeta(pattern)
+	pattern = strings.Replace(pattern, "\\*", ".*?", -1)
+	pattern, negatives := BuildNegativeMatches(pattern)
+	pattern = strings.Replace(pattern, ",", "|", -1)
+	// pattern = strings.Replace(pattern, "", "|", -1)
+	// (?<!multiple:example:b)
+
+	return RegExWrap(pattern), negatives
+}
+
+func RegExWrap(pattern string) string {
+	return "^(" + pattern + ")$"
+}
+
+/*
+	Find all negative namespaces and pull them out of the pattern.
+
+	But build a slice of negatives
+
+	example: pattern="*,-somenamespace"
+
+	Returns: "*", ["somenamespace"]
+*/
+func BuildNegativeMatches(pattern string) (string, []string) {
+	var negatives []string
+	negRegEx := regexp.MustCompile(`-([\w|\d|:]*)(,)?`)
+	matches := negRegEx.FindAllStringSubmatch(pattern, 100)
+	matchLen := len(matches)
+
+	if matchLen < 1 {
+		return pattern, nil
+	}
+
+	negatives = make([]string, matchLen)
+	for i := 0; i < matchLen; i++ {
+		m := matches[i][1]
+		negatives[i] = m
+		pattern = strings.Replace(pattern, ",-"+m, "", -1)
+	}
+	return pattern, negatives
 }
 
 /*
@@ -149,42 +191,35 @@ var SetHasTime = setBoolWithLock(func(isOn bool) {
 
 // Debug creates a debug function for `name` which you call
 // with printf-style arguments in your application or library.
-func Debug(name string) Debugger {
+func Debug(name string) *Debugger {
 	entry, cached := cache.Get(name)
 
 	if cached {
 		dbg, _ := entry.(Debugger)
-		return dbg
+		return &dbg
 	}
 
-	dbg := Debugger{}
-
-	dbg.name = name
-	dbg.prev = time.Now()
-	dbg.color = colors[rand.Intn(len(colors))]
+	dbg := Debugger{name: name, prev: time.Now(), color: colors[rand.Intn(len(colors))]}
 
 	if formatter.GetHasFieldsOnly() {
-		dbg = dbg.WithFields(map[string]interface{}{"namespace": name, "msg": nil})
+		dbg.WithFields(map[string]interface{}{"namespace": name, "msg": nil})
 
 		if HAS_TIME {
-			dbg = dbg.WithFields(map[string]interface{}{"time": nil, "delta": nil})
+			dbg.WithFields(map[string]interface{}{"time": nil, "delta": nil})
 		}
 	}
 
 	cache.Set(name, dbg, goCache.DefaultExpiration)
 
-	return dbg
+	return &dbg
 }
 
-func (dbg Debugger) Spawn(ns string) Debugger {
-	return Debug(dbg.name + ":" + ns)
+func (dbg *Debugger) Spawn(ns string) *Debugger {
+	d := Debug(dbg.name + ":" + ns)
+	return d
 }
 
-func (dbg Debugger) Log(args ...interface{}) {
-	var strOrFunc interface{}
-	var msg string
-	var isString bool
-
+func (dbg *Debugger) Log(args ...interface{}) {
 	if !enabled {
 		return
 	}
@@ -192,6 +227,16 @@ func (dbg Debugger) Log(args ...interface{}) {
 	if !reg.MatchString(dbg.name) {
 		return
 	}
+
+	for _, n := range neg {
+		if strings.Contains(dbg.name, n) {
+			return
+		}
+	}
+
+	var strOrFunc interface{}
+	var msg string
+	var isString bool
 
 	if len(args) >= 1 {
 		strOrFunc = args[0]
@@ -210,13 +255,13 @@ func (dbg Debugger) Log(args ...interface{}) {
 		}
 	}
 
-	preppedMsg := formatter.Format(&dbg, msg)
+	preppedMsg := formatter.Format(dbg, msg)
 
 	fmt.Fprintf(writer, preppedMsg, args...)
 	dbg.prev = time.Now()
 }
 
-func (dbg Debugger) WithFields(fields map[string]interface{}) Debugger {
+func (dbg *Debugger) WithFields(fields map[string]interface{}) *Debugger {
 	if len(dbg.fields) == 0 {
 		dbg.fields = fields
 		return dbg
@@ -225,6 +270,15 @@ func (dbg Debugger) WithFields(fields map[string]interface{}) Debugger {
 	for k, v := range fields {
 		dbg.fields[k] = v
 	}
+	return dbg
+}
+
+func (dbg *Debugger) WithField(key string, value interface{}) *Debugger {
+	if len(dbg.fields) == 0 {
+		dbg.fields = map[string]interface{}{}
+	}
+
+	dbg.fields[key] = value
 	return dbg
 }
 

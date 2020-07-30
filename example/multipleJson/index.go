@@ -7,7 +7,7 @@ import (
 	"github.com/nmccready/go-debug/example/rootDebug"
 )
 
-func work(debug Debugger, delay time.Duration) {
+func work(debug *Debugger, delay time.Duration) {
 	for {
 		debug.Log("doing stuff")
 		time.Sleep(delay)

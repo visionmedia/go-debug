@@ -7,7 +7,7 @@ import (
 	"github.com/nmccready/go-debug/example/rootDebug"
 )
 
-func work(debug Debugger, delay time.Duration) {
+func work(debug *Debugger, delay time.Duration) {
 	for {
 		debug.Log("doing stuff")
 		time.Sleep(delay)
@@ -21,7 +21,6 @@ func main() {
 		"another2": 2,
 		"junk1":    "hi junk1",
 	})
-	// fmt.Printf("fields %s\n", a.)
 	var b = rootDebug.Spawn("multiple:b")
 	var c = rootDebug.Spawn("multiple:c")
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -56,6 +55,7 @@ func TestEnable(t *testing.T) {
 	Enable("foo")
 
 	debug := Debug("foo")
+	// assert.Equal(t, "foo", debug.name)
 	debug.Log("something")
 	debug.Log("here")
 	debug.Log("whoop")
@@ -70,6 +70,23 @@ func TestEnable(t *testing.T) {
 	assert.Contains(t, str, "here")
 	assert.Contains(t, str, "whoop")
 	assert.Contains(t, str, "lazy")
+}
+
+func TestEnableNegative(t *testing.T) {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	SetWriter(buf)
+
+	Enable("*,-foo")
+
+	debug := Debug("foo")
+	// assert.Equal(t, "foo", debug.name)
+	debug.Log("something")
+	debug.Log("here")
+	debug.Log("whoop")
+	debug.Log(func() string { return "lazy" })
+
+	assert.Equal(t, buf.Len(), 0)
 }
 
 func TestColorsEnable(t *testing.T) {
@@ -108,7 +125,6 @@ func TestColorsDisable(t *testing.T) {
 	}
 
 	str := buf.String()
-	fmt.Println("str: ", str)
 	assert.Contains(t, str, "something")
 	assert.NotContains(t, str, getColorStr(colors[0], true))
 
@@ -267,96 +283,6 @@ func ExampleDebug() {
 	}
 }
 
-func BenchmarkDisabled(b *testing.B) {
-	debug := Debug("something")
-	for i := 0; i < b.N; i++ {
-		debug.Log("stuff")
-	}
-}
-
-func BenchmarkMatch(b *testing.B) {
-	debug := Debug("something")
-	Enable("something")
-	for i := 0; i < b.N; i++ {
-		debug.Log("stuff")
-	}
-}
-
-func BenchmarkMatchNonStringNonFunc(b *testing.B) {
-	debug := Debug("something")
-	Enable("something")
-	for i := 0; i < b.N; i++ {
-		debug.Log(os.Args[:1])
-	}
-}
-
-func BenchmarkDisabledLazy(b *testing.B) {
-	debug := Debug("something")
-	for i := 0; i < b.N; i++ {
-		debug.Log(func() string { return "lazy" })
-	}
-}
-
-func BenchmarkNonMatch(b *testing.B) {
-	debug := Debug("something")
-	Enable("nonmatch")
-	for i := 0; i < b.N; i++ {
-		debug.Log("stuff")
-	}
-}
-
-func BenchmarkLargeNonMatch(b *testing.B) {
-	debug := Debug("large:not:lazy")
-
-	abs, _ := filepath.Abs("./crashes.json")
-	file := GetFileBytes(abs)
-
-	Enable("nonmatch")
-	for i := 0; i < b.N; i++ {
-		debug.Log(string(file))
-	}
-}
-
-func BenchmarkLargeLazyNonMatch(b *testing.B) {
-	debug := Debug("large:lazy")
-
-	abs, _ := filepath.Abs("./crashes.json")
-	file := GetFileBytes(abs)
-
-	Enable("nonmatch")
-	for i := 0; i < b.N; i++ {
-		debug.Log(func() string {
-			return string(file)
-		})
-	}
-}
-
-func BenchmarkLargeMatch(b *testing.B) {
-	debug := Debug("large:lazy")
-
-	abs, _ := filepath.Abs("./crashes.json")
-	file := GetFileBytes(abs)
-
-	Enable("large:lazy")
-	for i := 0; i < b.N; i++ {
-		debug.Log(string(file))
-	}
-}
-
-func BenchmarkLargeLazyMatch(b *testing.B) {
-	debug := Debug("large:lazy")
-
-	abs, _ := filepath.Abs("./crashes.json")
-	file := GetFileBytes(abs)
-
-	Enable("large:lazy")
-	for i := 0; i < b.N; i++ {
-		debug.Log(func() string {
-			return string(file)
-		})
-	}
-}
-
 func GetFileBytes(filename string) []byte {
 	file, err := os.Open(filename)
 	// if we os.Open returns an error then handle it
@@ -368,4 +294,40 @@ func GetFileBytes(filename string) []byte {
 	bytes, _ := ioutil.ReadAll(file)
 
 	return bytes
+}
+
+func TestBuildPattern(t *testing.T) {
+	tests := []struct {
+		in        string
+		pattern   string
+		negatives []string
+	}{
+		{
+			in:      "a,b,c",
+			pattern: RegExWrap("a|b|c"),
+		},
+		{
+			in:        "a,-b,-c",
+			pattern:   RegExWrap("a"),
+			negatives: []string{"b", "c"},
+		},
+		{
+			in:        "*,-b,-c",
+			pattern:   RegExWrap(".*?"),
+			negatives: []string{"b", "c"},
+		},
+		{
+			in:        "parent:child*,-parent:child:a,parent:child:b,-parent:child:c",
+			pattern:   RegExWrap(`parent:child.*?|parent:child:b`),
+			negatives: []string{"parent:child:a", "parent:child:c"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		actual, actualNegs := BuildPattern(tt.in)
+
+		assert.Equal(t, tt.pattern, actual, "pattern matches")
+		assert.Equal(t, tt.negatives, actualNegs, "pattern matches")
+	}
 }
