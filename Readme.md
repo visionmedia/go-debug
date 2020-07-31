@@ -7,7 +7,7 @@ View the [docs](http://godoc.org/github.com/tj/go-debug).
 ## Installation
 
 ```
-$ go get github.com/tj/go-debug
+$ go get github.com/nmccready/go-debug
 ```
 
 ## [Example](./example/readme/index.go)
