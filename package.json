@@ -1,7 +1,7 @@
 {
   "name": "@znemz/go-debug",
   "private": true,
-  "version": "0.0.6",
+  "version": "0.1.0",
   "description": "lambda go sample, package.json is for versioning only",
   "repository": {
     "type": "git",
