@@ -15,20 +15,31 @@ import (
 )
 
 var (
-	writer    io.Writer = os.Stderr
-	reg       *regexp.Regexp
-	m         sync.Mutex
-	enabled   = false
-	cache     *goCache.Cache
-	hasColors = true
+	writer     io.Writer = os.Stderr
+	reg        *regexp.Regexp
+	neg        []string
+	m          sync.Mutex
+	enabled    = false
+	cache      *goCache.Cache
+	HAS_COLORS           = true
+	HAS_TIME             = true
+	formatter  Formatter = &TextFormatter{HasColor: true}
 )
 
-// Debugger function.
-type DebugFunction func(...interface{})
+type Fields map[string]interface{}
 
 type Debugger struct {
-	Log   DebugFunction
-	Spawn func(ns string) Debugger
+	name   string
+	prev   time.Time
+	fields Fields
+	color  string
+}
+
+type IDebugger interface {
+	Log(...interface{})
+	Spawn(ns string) *Debugger
+	WithFields(fields map[string]interface{}) *Debugger
+	WithField(key string, value interface{}) *Debugger
 }
 
 // Terminal colors used at random.
@@ -46,12 +57,14 @@ func init() {
 	env := os.Getenv("DEBUG")
 	cacheMinStr := os.Getenv("DEBUG_CACHE_MINUTES")
 	colorOffStr := os.Getenv("DEBUG_COLOR_OFF")
+	timeOffStr := os.Getenv("DEBUG_TIME_OFF")
 
 	if "" != env {
 		Enable(env)
 	}
 
 	SetHasColors(colorOffStr == "")
+	SetHasTime(timeOffStr == "")
 
 	err := SetCache(cacheMinStr)
 
@@ -74,6 +87,12 @@ func Disable() {
 	enabled = false
 }
 
+func SetFormatter(f Formatter) {
+	m.Lock()
+	defer m.Unlock()
+	formatter = f
+}
+
 /*
 	Enable the given debug `pattern`. Patterns take a glob-like form,
 	for example if you wanted to enable everything, just use "*", or
@@ -86,12 +105,52 @@ func Disable() {
 func Enable(pattern string) {
 	m.Lock()
 	defer m.Unlock()
-	pattern = regexp.QuoteMeta(pattern)
-	pattern = strings.Replace(pattern, "\\*", ".*?", -1)
-	pattern = strings.Replace(pattern, ",", "|", -1)
-	pattern = "^(" + pattern + ")$"
+	pattern, neg = BuildPattern(pattern)
 	reg = regexp.MustCompile(pattern)
 	enabled = true
+}
+
+func BuildPattern(pattern string) (string, []string) {
+	pattern = regexp.QuoteMeta(pattern)
+	pattern = strings.Replace(pattern, "\\*", ".*?", -1)
+	pattern, negatives := BuildNegativeMatches(pattern)
+	pattern = strings.Replace(pattern, ",", "|", -1)
+	// pattern = strings.Replace(pattern, "", "|", -1)
+	// (?<!multiple:example:b)
+
+	return RegExWrap(pattern), negatives
+}
+
+func RegExWrap(pattern string) string {
+	return "^(" + pattern + ")$"
+}
+
+/*
+	Find all negative namespaces and pull them out of the pattern.
+
+	But build a slice of negatives
+
+	example: pattern="*,-somenamespace"
+
+	Returns: "*", ["somenamespace"]
+*/
+func BuildNegativeMatches(pattern string) (string, []string) {
+	var negatives []string
+	negRegEx := regexp.MustCompile(`-([\w|\d|:]*)(,)?`)
+	matches := negRegEx.FindAllStringSubmatch(pattern, 100)
+	matchLen := len(matches)
+
+	if matchLen < 1 {
+		return pattern, nil
+	}
+
+	negatives = make([]string, matchLen)
+	for i := 0; i < matchLen; i++ {
+		m := matches[i][1]
+		negatives[i] = m
+		pattern = strings.Replace(pattern, ",-"+m, "", -1)
+	}
+	return pattern, negatives
 }
 
 /*
@@ -114,70 +173,112 @@ func SetCache(cacheMinStr string) error {
 	return nil
 }
 
-func SetHasColors(onOff bool) {
-	m.Lock()
-	defer m.Unlock()
-	hasColors = onOff
+func setBoolWithLock(work func(bool)) func(bool) {
+	return func(isOn bool) {
+		m.Lock()
+		defer m.Unlock()
+		work(isOn)
+	}
 }
+
+var SetHasColors = setBoolWithLock(func(isOn bool) {
+	HAS_COLORS = isOn
+})
+
+var SetHasTime = setBoolWithLock(func(isOn bool) {
+	HAS_TIME = isOn
+})
 
 // Debug creates a debug function for `name` which you call
 // with printf-style arguments in your application or library.
-func Debug(name string) Debugger {
+func Debug(name string) *Debugger {
 	entry, cached := cache.Get(name)
 
 	if cached {
 		dbg, _ := entry.(Debugger)
-		return dbg
+		return &dbg
 	}
 
-	prevGlobal := time.Now()
-	color := colors[rand.Intn(len(colors))]
-	prev := time.Now()
+	dbg := Debugger{name: name, prev: time.Now(), color: colors[rand.Intn(len(colors))]}
 
-	dbg := Debugger{}
+	if formatter.GetHasFieldsOnly() {
+		dbg.WithFields(map[string]interface{}{"namespace": name, "msg": nil})
 
-	dbg.Spawn = func(ns string) Debugger {
-		return Debug(name + ":" + ns)
-	}
-
-	dbg.Log = func(args ...interface{}) {
-		var strOrFunc interface{}
-		var format string
-		var isString bool
-
-		if !enabled {
-			return
+		if HAS_TIME {
+			dbg.WithFields(map[string]interface{}{"time": nil, "delta": nil})
 		}
-
-		if !reg.MatchString(name) {
-			return
-		}
-
-		if len(args) >= 1 {
-			strOrFunc = args[0]
-			args = args[1:]
-
-			format, isString = strOrFunc.(string)
-
-			if !isString {
-				lazy, isFunc := strOrFunc.(func() string)
-				if !isFunc {
-					// coerce to string
-					format = fmt.Sprint(strOrFunc)
-				} else {
-					format = lazy()
-				}
-			}
-		}
-
-		d := deltas(prevGlobal, prev, color)
-		fmt.Fprintf(writer, d+" "+getColorStr(color, hasColors)+name+getColorOff(hasColors)+" - "+format+"\n", args...)
-		prevGlobal = time.Now()
-		prev = time.Now()
 	}
 
 	cache.Set(name, dbg, goCache.DefaultExpiration)
 
+	return &dbg
+}
+
+func (dbg *Debugger) Spawn(ns string) *Debugger {
+	d := Debug(dbg.name + ":" + ns)
+	return d
+}
+
+func (dbg *Debugger) Log(args ...interface{}) {
+	if !enabled {
+		return
+	}
+
+	if !reg.MatchString(dbg.name) {
+		return
+	}
+
+	for _, n := range neg {
+		if strings.Contains(dbg.name, n) {
+			return
+		}
+	}
+
+	var strOrFunc interface{}
+	var msg string
+	var isString bool
+
+	if len(args) >= 1 {
+		strOrFunc = args[0]
+		args = args[1:]
+
+		msg, isString = strOrFunc.(string)
+
+		if !isString {
+			lazy, isFunc := strOrFunc.(func() string)
+			if !isFunc {
+				// coerce to string
+				msg = fmt.Sprint(strOrFunc)
+			} else {
+				msg = lazy()
+			}
+		}
+	}
+
+	preppedMsg := formatter.Format(dbg, msg)
+
+	fmt.Fprintf(writer, preppedMsg, args...)
+	dbg.prev = time.Now()
+}
+
+func (dbg *Debugger) WithFields(fields map[string]interface{}) *Debugger {
+	if len(dbg.fields) == 0 {
+		dbg.fields = fields
+		return dbg
+	}
+
+	for k, v := range fields {
+		dbg.fields[k] = v
+	}
+	return dbg
+}
+
+func (dbg *Debugger) WithField(key string, value interface{}) *Debugger {
+	if len(dbg.fields) == 0 {
+		dbg.fields = map[string]interface{}{}
+	}
+
+	dbg.fields[key] = value
 	return dbg
 }
 
@@ -195,14 +296,20 @@ func getColorOff(isOn bool) string {
 	return "\033[0m"
 }
 
+func getTime(timestring string, delta string, isOn bool) string {
+	if !isOn {
+		return ""
+	}
+
+	return fmt.Sprintf("%s %-6s", timestring, delta)
+}
+
 // Return formatting for deltas.
-func deltas(prevGlobal, prev time.Time, color string) string {
+func deltas(prev time.Time) (string, string) {
 	now := time.Now()
-	global := now.Sub(prevGlobal).Nanoseconds()
 	delta := now.Sub(prev).Nanoseconds()
 	ts := now.UTC().Format("15:04:05.000")
-	deltas := fmt.Sprintf("%s %-6s "+getColorStr(color, hasColors)+"%-6s", ts, humanizeNano(global), humanizeNano(delta))
-	return deltas
+	return ts, humanizeNano(delta)
 }
 
 // Humanize nanoseconds to a string.
