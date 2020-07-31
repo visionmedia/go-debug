@@ -51,7 +51,7 @@ func (t *TextFormatter) Format(dbg *Debugger, msg string) string {
 		fields = t.appendKeyValue(fields, k, v)
 	}
 
-	if !t.HasFieldsOnly {
+	if !t.GetHasFieldsOnly() {
 		mainMsg = BasicFormat(finalized.TimeString, finalized.Delta, finalized.Namespace, msg)
 		if fields != "" {
 			fields = "    " + fields

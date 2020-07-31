@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 
@@ -188,7 +189,7 @@ func TestSpawnMultipleEnabled(t *testing.T) {
 	buf := bytes.NewBuffer(b)
 	SetWriter(buf)
 
-	Enable("foo*,bar*")
+	Enable("error*,foo*,bar*")
 
 	//nolint
 	var foo IDebugger
@@ -199,6 +200,8 @@ func TestSpawnMultipleEnabled(t *testing.T) {
 
 	bar := Debug("bar").Spawn("child").Spawn("grandChild")
 	bar.Log("bar")
+	bar.Error("oops")
+	bar.Error(func() string { return "oh no" })
 	bar.Log(func() string { return "bar lazy" })
 
 	if buf.Len() == 0 {
@@ -212,6 +215,9 @@ func TestSpawnMultipleEnabled(t *testing.T) {
 	assert.Contains(t, str, "bar:child:grandChild")
 	assert.Contains(t, str, "bar")
 	assert.Contains(t, str, "bar lazy")
+	assert.Contains(t, str, "error:bar")
+	assert.Contains(t, str, "oops")
+	assert.Contains(t, str, "oh no")
 }
 
 func TestEnableDisable(t *testing.T) {
@@ -300,7 +306,7 @@ func TestBuildPattern(t *testing.T) {
 	tests := []struct {
 		in        string
 		pattern   string
-		negatives []string
+		negatives []*regexp.Regexp
 	}{
 		{
 			in:      "a,b,c",
@@ -309,17 +315,17 @@ func TestBuildPattern(t *testing.T) {
 		{
 			in:        "a,-b,-c",
 			pattern:   RegExWrap("a"),
-			negatives: []string{"b", "c"},
+			negatives: []*regexp.Regexp{RegExWrapCompile("b"), RegExWrapCompile("c")},
 		},
 		{
 			in:        "*,-b,-c",
 			pattern:   RegExWrap(".*?"),
-			negatives: []string{"b", "c"},
+			negatives: []*regexp.Regexp{RegExWrapCompile("b"), RegExWrapCompile("c")},
 		},
 		{
 			in:        "parent:child*,-parent:child:a,parent:child:b,-parent:child:c",
 			pattern:   RegExWrap(`parent:child.*?|parent:child:b`),
-			negatives: []string{"parent:child:a", "parent:child:c"},
+			negatives: []*regexp.Regexp{RegExWrapCompile("parent:child:a"), RegExWrapCompile("parent:child:c")},
 		},
 	}
 
@@ -328,6 +334,11 @@ func TestBuildPattern(t *testing.T) {
 		actual, actualNegs := BuildPattern(tt.in)
 
 		assert.Equal(t, tt.pattern, actual, "pattern matches")
-		assert.Equal(t, tt.negatives, actualNegs, "pattern matches")
+		for i, rp := range tt.negatives {
+			er := *rp
+			ar := *actualNegs[i]
+			assert.Equal(t, er, ar, "pattern matches")
+		}
+
 	}
 }

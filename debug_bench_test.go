@@ -21,6 +21,14 @@ func BenchmarkMatch(b *testing.B) {
 	}
 }
 
+func BenchmarkMatchError(b *testing.B) {
+	debug := Debug("something")
+	Enable("error*")
+	for i := 0; i < b.N; i++ {
+		debug.Error("stuff")
+	}
+}
+
 func BenchmarkMatchNonStringNonFunc(b *testing.B) {
 	debug := Debug("something")
 	Enable("something")

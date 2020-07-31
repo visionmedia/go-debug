@@ -17,13 +17,14 @@ import (
 var (
 	writer     io.Writer = os.Stderr
 	reg        *regexp.Regexp
-	neg        []string
+	neg        []*regexp.Regexp
 	m          sync.Mutex
 	enabled    = false
 	cache      *goCache.Cache
 	HAS_COLORS           = true
 	HAS_TIME             = true
 	formatter  Formatter = &TextFormatter{HasColor: true}
+	negRegEx             = regexp.MustCompile(`^-.*?`)
 )
 
 type Fields map[string]interface{}
@@ -37,6 +38,7 @@ type Debugger struct {
 
 type IDebugger interface {
 	Log(...interface{})
+	Error(...interface{})
 	Spawn(ns string) *Debugger
 	WithFields(fields map[string]interface{}) *Debugger
 	WithField(key string, value interface{}) *Debugger
@@ -110,19 +112,25 @@ func Enable(pattern string) {
 	enabled = true
 }
 
-func BuildPattern(pattern string) (string, []string) {
+func BuildPattern(pattern string) (string, []*regexp.Regexp) {
 	pattern = regexp.QuoteMeta(pattern)
-	pattern = strings.Replace(pattern, "\\*", ".*?", -1)
-	pattern, negatives := BuildNegativeMatches(pattern)
+	pattern = RegExWildCard(pattern)
 	pattern = strings.Replace(pattern, ",", "|", -1)
-	// pattern = strings.Replace(pattern, "", "|", -1)
-	// (?<!multiple:example:b)
 
+	pattern, negatives := BuildNegativeMatches(pattern, `|`)
 	return RegExWrap(pattern), negatives
+}
+
+func RegExWildCard(pattern string) string {
+	return strings.Replace(pattern, "\\*", ".*?", -1)
 }
 
 func RegExWrap(pattern string) string {
 	return "^(" + pattern + ")$"
+}
+
+func RegExWrapCompile(pattern string) *regexp.Regexp {
+	return regexp.MustCompile(RegExWrap(pattern))
 }
 
 /*
@@ -134,21 +142,20 @@ func RegExWrap(pattern string) string {
 
 	Returns: "*", ["somenamespace"]
 */
-func BuildNegativeMatches(pattern string) (string, []string) {
-	var negatives []string
-	negRegEx := regexp.MustCompile(`-([\w|\d|:]*)(,)?`)
-	matches := negRegEx.FindAllStringSubmatch(pattern, 100)
-	matchLen := len(matches)
-
-	if matchLen < 1 {
-		return pattern, nil
+func BuildNegativeMatches(pattern string, orString string) (string, []*regexp.Regexp) {
+	if orString == "" {
+		orString = ","
 	}
+	var negatives []*regexp.Regexp
+	maybeNegs := strings.Split(pattern, orString)
 
-	negatives = make([]string, matchLen)
-	for i := 0; i < matchLen; i++ {
-		m := matches[i][1]
-		negatives[i] = m
-		pattern = strings.Replace(pattern, ",-"+m, "", -1)
+	// fmt.Printf("maybeNegs: %+v\n", maybeNegs)
+
+	for _, s := range maybeNegs {
+		if negRegEx.MatchString(s) {
+			negatives = append(negatives, RegExWrapCompile(strings.Replace(s, "-", "", 1)))
+			pattern = strings.Replace(pattern, orString+s, "", -1)
+		}
 	}
 	return pattern, negatives
 }
@@ -215,8 +222,7 @@ func Debug(name string) *Debugger {
 }
 
 func (dbg *Debugger) Spawn(ns string) *Debugger {
-	d := Debug(dbg.name + ":" + ns)
-	return d
+	return Debug(dbg.name + ":" + ns)
 }
 
 func (dbg *Debugger) Log(args ...interface{}) {
@@ -229,7 +235,7 @@ func (dbg *Debugger) Log(args ...interface{}) {
 	}
 
 	for _, n := range neg {
-		if strings.Contains(dbg.name, n) {
+		if n.MatchString(dbg.name) {
 			return
 		}
 	}
@@ -259,6 +265,11 @@ func (dbg *Debugger) Log(args ...interface{}) {
 
 	fmt.Fprintf(writer, preppedMsg, args...)
 	dbg.prev = time.Now()
+}
+
+func (dbg *Debugger) Error(args ...interface{}) {
+	// prepend error name as it is easier to filter!
+	Debug("error:" + dbg.name).Log(args...)
 }
 
 func (dbg *Debugger) WithFields(fields map[string]interface{}) *Debugger {

@@ -10,6 +10,7 @@ import (
 func work(debug *Debugger, delay time.Duration) {
 	for {
 		debug.Log("doing stuff")
+		debug.Error("oops")
 		time.Sleep(delay)
 	}
 }
